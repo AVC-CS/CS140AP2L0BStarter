@@ -1,0 +1,92 @@
+name: GitHub Classroom Workflow
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  repository_dispatch:
+
+permissions:
+  checks: write
+  actions: read
+  contents: read
+
+jobs:
+  run-autograding-tests:
+    runs-on: ubuntu-latest
+    if: github.actor != 'github-classroom[bot]'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # The runner image already has Java; Mars4_5.jar ships in the repo. Nothing to install.
+
+      # ---- Grader 1: assemble every example program (10 pts) ----
+      # ae1 = exit 1 on an assembly error; a = assemble only, do not run.
+      - name: Assemble ex4.asm ex5.asm ex6.asm
+        id: compile
+        uses: classroom-resources/autograding-command-grader@v1
+        with:
+          test-name: "Assemble ex4.asm ex5.asm ex6.asm"
+          command: java -jar Mars4_5.jar nc ae1 a ex4.asm && java -jar Mars4_5.jar nc ae1 a ex5.asm && java -jar Mars4_5.jar nc ae1 a ex6.asm
+          timeout: 30
+          max-score: 10
+
+      # ---- Grader 2: run every program on its data sets (10 pts) ----
+      # data/run.sh writes result_<prog>_N.txt = the program's output + MARS's Mem[...] lines.
+      - name: Run ex4.asm ex5.asm ex6.asm
+        id: run
+        uses: classroom-resources/autograding-command-grader@v1
+        with:
+          test-name: "Run ex4.asm ex5.asm ex6.asm"
+          command: chmod +x data/run.sh && data/run.sh
+          timeout: 120
+          max-score: 10
+
+      # Install pytest once for the next graders
+      - name: Install pytest
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pytest
+
+      # ---- Grader 3: pytest -m T1 = ex4.asm (26 pts) ----
+      - name: T1 tests
+        id: T1
+        uses: classroom-resources/autograding-command-grader@v1
+        with:
+          test-name: "T1 tests"
+          command: pytest -rP -m T1
+          timeout: 10
+          max-score: 26
+
+      # ---- Grader 4: pytest -m T2 = ex5.asm (27 pts) ----
+      - name: T2 tests
+        id: T2
+        uses: classroom-resources/autograding-command-grader@v1
+        with:
+          test-name: "T2 tests"
+          command: pytest -rP -m T2
+          timeout: 10
+          max-score: 27
+
+      # ---- Grader 5: pytest -m T3 = ex6.asm (27 pts) ----
+      - name: T3 tests
+        id: T3
+        uses: classroom-resources/autograding-command-grader@v1
+        with:
+          test-name: "T3 tests"
+          command: pytest -rP -m T3
+          timeout: 10
+          max-score: 27
+
+      # ---- Reporter ----
+      - name: Autograding Reporter
+        uses: classroom-resources/autograding-grading-reporter@v1
+        env:
+          COMPILE_RESULTS: "${{ steps.compile.outputs.result }}"
+          RUN_RESULTS: "${{ steps.run.outputs.result }}"
+          T1_RESULTS: "${{ steps.T1.outputs.result }}"
+          T2_RESULTS: "${{ steps.T2.outputs.result }}"
+          T3_RESULTS: "${{ steps.T3.outputs.result }}"
+        with:
+          runners: compile,run,T1,T2,T3
